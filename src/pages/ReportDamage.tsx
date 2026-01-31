@@ -7,13 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Camera, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Camera, MapPin, CheckCircle2, AlertTriangle, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const ReportDamage = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -26,7 +28,32 @@ const ReportDamage = () => {
     description: "",
   });
 
+  const captureGPSLocation = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setGpsCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          toast({
+            title: "GPS Location Captured!",
+            description: `Coordinates: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`,
+          });
+        },
+        (error) => {
+          toast({
+            title: "Location Access Denied",
+            description: "Please allow location access for GPS coordinates.",
+            variant: "destructive",
+          });
+        }
+      );
+    }
+  };
+
   const handleCaptureImage = async () => {
+    setIsCapturing(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       const video = document.createElement("video");
@@ -48,6 +75,9 @@ const ReportDamage = () => {
 
       stream.getTracks().forEach((track) => track.stop());
 
+      // Auto-capture GPS when image is taken
+      captureGPSLocation();
+
       toast({
         title: "Image Captured!",
         description: "Photo has been captured successfully.",
@@ -58,7 +88,14 @@ const ReportDamage = () => {
         description: "Please allow camera access to capture images.",
         variant: "destructive",
       });
+    } finally {
+      setIsCapturing(false);
     }
+  };
+
+  const handleRetakeImage = () => {
+    setImagePreview(null);
+    setGpsCoords(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,6 +124,7 @@ const ReportDamage = () => {
       description: "",
     });
     setImagePreview(null);
+    setGpsCoords(null);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -147,16 +185,30 @@ const ReportDamage = () => {
                       )}
                     </div>
 
-                    <Button type="button" variant="outline" className="w-full" onClick={handleCaptureImage}>
-                      <Camera className="h-4 w-4 mr-2" />
-                      Capture Image
-                    </Button>
+                    {imagePreview ? (
+                      <Button type="button" variant="outline" className="w-full" onClick={handleRetakeImage}>
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Retake Image
+                      </Button>
+                    ) : (
+                      <Button type="button" variant="outline" className="w-full" onClick={handleCaptureImage} disabled={isCapturing}>
+                        <Camera className="h-4 w-4 mr-2" />
+                        {isCapturing ? "Capturing..." : "Capture Image"}
+                      </Button>
+                    )}
 
-                    {/* GPS Location */}
-                    <Button type="button" variant="outline" className="w-full">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Capture GPS Location
-                    </Button>
+                    {/* GPS Location Display */}
+                    {gpsCoords ? (
+                      <div className="flex items-center gap-2 p-3 bg-success/10 text-success rounded-lg text-sm">
+                        <MapPin className="h-4 w-4" />
+                        <span>GPS: {gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)}</span>
+                      </div>
+                    ) : (
+                      <Button type="button" variant="outline" className="w-full" onClick={captureGPSLocation}>
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Capture GPS Location
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
