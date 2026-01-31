@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Camera, MapPin, Upload, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Camera, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const ReportDamage = () => {
@@ -26,14 +26,38 @@ const ReportDamage = () => {
     description: "",
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleCaptureImage = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.play();
+
+      await new Promise((resolve) => {
+        video.onloadedmetadata = resolve;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(video, 0, 0);
+
+      const imageData = canvas.toDataURL("image/jpeg", 0.8);
+      setImagePreview(imageData);
+
+      stream.getTracks().forEach((track) => track.stop());
+
+      toast({
+        title: "Image Captured!",
+        description: "Photo has been captured successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Camera Access Denied",
+        description: "Please allow camera access to capture images.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -103,7 +127,7 @@ const ReportDamage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl bg-muted/50 cursor-pointer hover:bg-muted transition-colors">
+                    <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl bg-muted/50">
                       {imagePreview ? (
                         <img
                           src={imagePreview}
@@ -112,22 +136,21 @@ const ReportDamage = () => {
                         />
                       ) : (
                         <div className="text-center p-4">
-                          <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                          <Camera className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
                           <p className="text-sm text-muted-foreground">
-                            Click to upload or drag and drop
+                            No image captured yet
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            PNG, JPG up to 10MB
+                            Click button below to capture
                           </p>
                         </div>
                       )}
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                      />
-                    </label>
+                    </div>
+
+                    <Button type="button" variant="outline" className="w-full" onClick={handleCaptureImage}>
+                      <Camera className="h-4 w-4 mr-2" />
+                      Capture Image
+                    </Button>
 
                     {/* GPS Location */}
                     <Button type="button" variant="outline" className="w-full">
