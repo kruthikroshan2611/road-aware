@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Camera, X, RotateCcw, Check, Settings2 } from "lucide-react";
+import { Camera, X, RotateCcw, Check, Settings2, Zap, ZapOff, SwitchCamera } from "lucide-react";
 
 interface CameraCaptureProps {
   onCapture: (imageData: string, quality: number) => void;
@@ -21,6 +21,9 @@ const CameraCapture = ({ onCapture, onClose, isOpen }: CameraCaptureProps) => {
   const [compressionQuality, setCompressionQuality] = useState(80);
   const [showSettings, setShowSettings] = useState(false);
   const [estimatedSize, setEstimatedSize] = useState<string>("");
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [isFlashOn, setIsFlashOn] = useState(false);
+  const [hasFlash, setHasFlash] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -29,18 +32,29 @@ const CameraCapture = ({ onCapture, onClose, isOpen }: CameraCaptureProps) => {
     return () => {
       stopCamera();
     };
-  }, [isOpen]);
+  }, [isOpen, facingMode]);
 
   const startCamera = async () => {
     try {
+      // Stop existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          facingMode: "environment",
+          facingMode: facingMode,
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
       });
       streamRef.current = stream;
+      
+      // Check if flash/torch is available
+      const videoTrack = stream.getVideoTracks()[0];
+      const capabilities = videoTrack.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
+      setHasFlash(capabilities?.torch === true);
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
@@ -52,6 +66,27 @@ const CameraCapture = ({ onCapture, onClose, isOpen }: CameraCaptureProps) => {
     }
   };
 
+  const toggleFlash = async () => {
+    if (streamRef.current && hasFlash) {
+      const videoTrack = streamRef.current.getVideoTracks()[0];
+      const newFlashState = !isFlashOn;
+      try {
+        await videoTrack.applyConstraints({
+          advanced: [{ torch: newFlashState } as MediaTrackConstraintSet]
+        });
+        setIsFlashOn(newFlashState);
+      } catch (error) {
+        console.error("Flash toggle failed:", error);
+      }
+    }
+  };
+
+  const switchCamera = () => {
+    setFacingMode(prev => prev === "environment" ? "user" : "environment");
+    setIsFlashOn(false);
+    setIsCameraReady(false);
+  };
+
   const stopCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -59,6 +94,7 @@ const CameraCapture = ({ onCapture, onClose, isOpen }: CameraCaptureProps) => {
     }
     setIsCameraReady(false);
     setCapturedImage(null);
+    setIsFlashOn(false);
   };
 
   const capturePhoto = () => {
@@ -126,7 +162,7 @@ const CameraCapture = ({ onCapture, onClose, isOpen }: CameraCaptureProps) => {
 
         <div className="relative">
           {/* Camera Preview / Captured Image */}
-          <div className="relative aspect-[4/3] bg-black">
+        <div className="relative aspect-[4/3] bg-black">
             {capturedImage ? (
               <img 
                 src={capturedImage} 
@@ -139,7 +175,7 @@ const CameraCapture = ({ onCapture, onClose, isOpen }: CameraCaptureProps) => {
                 autoPlay 
                 playsInline 
                 muted 
-                className="w-full h-full object-contain"
+                className={`w-full h-full object-contain ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
               />
             )}
             
@@ -150,6 +186,36 @@ const CameraCapture = ({ onCapture, onClose, isOpen }: CameraCaptureProps) => {
                   <Camera className="h-12 w-12 mx-auto mb-2 animate-pulse" />
                   <p>Starting camera...</p>
                 </div>
+              </div>
+            )}
+
+            {/* Camera controls overlay */}
+            {isCameraReady && !capturedImage && (
+              <div className="absolute top-3 left-3 right-3 flex justify-between">
+                {/* Flash toggle */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleFlash}
+                  disabled={!hasFlash}
+                  className={`bg-black/50 hover:bg-black/70 text-white ${!hasFlash ? "opacity-50" : ""}`}
+                  title={hasFlash ? (isFlashOn ? "Turn off flash" : "Turn on flash") : "Flash not available"}
+                >
+                  {isFlashOn ? <Zap className="h-5 w-5 text-yellow-400" /> : <ZapOff className="h-5 w-5" />}
+                </Button>
+
+                {/* Camera switch */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={switchCamera}
+                  className="bg-black/50 hover:bg-black/70 text-white"
+                  title="Switch camera"
+                >
+                  <SwitchCamera className="h-5 w-5" />
+                </Button>
               </div>
             )}
 
