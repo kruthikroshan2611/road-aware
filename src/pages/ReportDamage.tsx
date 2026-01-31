@@ -7,15 +7,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Camera, MapPin, CheckCircle2, AlertTriangle, RotateCcw } from "lucide-react";
+import { Camera, MapPin, CheckCircle2, AlertTriangle, RotateCcw, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import CameraCapture from "@/components/report/CameraCapture";
 
 const ReportDamage = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageSize, setImageSize] = useState<string>("");
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -52,49 +54,27 @@ const ReportDamage = () => {
     }
   };
 
-  const handleCaptureImage = async () => {
-    setIsCapturing(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.play();
-
-      await new Promise((resolve) => {
-        video.onloadedmetadata = resolve;
-      });
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      ctx?.drawImage(video, 0, 0);
-
-      const imageData = canvas.toDataURL("image/jpeg", 0.8);
-      setImagePreview(imageData);
-
-      stream.getTracks().forEach((track) => track.stop());
-
-      // Auto-capture GPS when image is taken
-      captureGPSLocation();
-
-      toast({
-        title: "Image Captured!",
-        description: "Photo has been captured successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Camera Access Denied",
-        description: "Please allow camera access to capture images.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCapturing(false);
-    }
+  const handleImageCapture = (imageData: string, quality: number) => {
+    setImagePreview(imageData);
+    
+    // Calculate file size
+    const base64Length = imageData.length - "data:image/jpeg;base64,".length;
+    const sizeInBytes = (base64Length * 3) / 4;
+    const sizeInKB = (sizeInBytes / 1024).toFixed(1);
+    setImageSize(`${sizeInKB} KB (${quality}% quality)`);
+    
+    // Auto-capture GPS when image is taken
+    captureGPSLocation();
+    
+    toast({
+      title: "Image Captured!",
+      description: `Photo saved at ${quality}% quality (${sizeInKB} KB)`,
+    });
   };
 
   const handleRetakeImage = () => {
     setImagePreview(null);
+    setImageSize("");
     setGpsCoords(null);
   };
 
@@ -186,14 +166,20 @@ const ReportDamage = () => {
                     </div>
 
                     {imagePreview ? (
-                      <Button type="button" variant="outline" className="w-full" onClick={handleRetakeImage}>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Retake Image
-                      </Button>
+                      <>
+                        <div className="text-xs text-muted-foreground text-center">
+                          <ImageIcon className="h-3 w-3 inline mr-1" />
+                          {imageSize}
+                        </div>
+                        <Button type="button" variant="outline" className="w-full" onClick={handleRetakeImage}>
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Retake Image
+                        </Button>
+                      </>
                     ) : (
-                      <Button type="button" variant="outline" className="w-full" onClick={handleCaptureImage} disabled={isCapturing}>
+                      <Button type="button" variant="outline" className="w-full" onClick={() => setIsCameraOpen(true)}>
                         <Camera className="h-4 w-4 mr-2" />
-                        {isCapturing ? "Capturing..." : "Capture Image"}
+                        Open Camera
                       </Button>
                     )}
 
@@ -380,6 +366,13 @@ const ReportDamage = () => {
         </div>
       </main>
       <Footer />
+      
+      {/* Camera Capture Modal */}
+      <CameraCapture
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onCapture={handleImageCapture}
+      />
     </div>
   );
 };
