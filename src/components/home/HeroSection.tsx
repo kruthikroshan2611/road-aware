@@ -1,8 +1,12 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Search, ArrowRight, CheckCircle2 } from "lucide-react";
+import { useReportStats } from "@/hooks/useReportStats";
 
 const HeroSection = () => {
+  const { total, resolved, isLoading } = useReportStats();
+  const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
   return (
     <section className="relative overflow-hidden">
       {/* Background Pattern */}
@@ -49,7 +53,9 @@ const HeroSection = () => {
             {/* Stats */}
             <div className="flex flex-wrap gap-8 pt-4">
               <div>
-                <p className="text-3xl font-bold text-foreground">2,500+</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {isLoading ? "..." : resolved.toLocaleString()}+
+                </p>
                 <p className="text-sm text-muted-foreground">Issues Resolved</p>
               </div>
               <div>
@@ -57,8 +63,10 @@ const HeroSection = () => {
                 <p className="text-sm text-muted-foreground">Avg. Response Time</p>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">94%</p>
-                <p className="text-sm text-muted-foreground">Satisfaction Rate</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {isLoading ? "..." : `${resolutionRate}%`}
+                </p>
+                <p className="text-sm text-muted-foreground">Resolution Rate</p>
               </div>
             </div>
           </div>
@@ -87,7 +95,11 @@ const HeroSection = () => {
               {/* Card Footer */}
               <div className="p-4 bg-card border-t border-border">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Active Reports: <strong className="text-foreground">127</strong></span>
+                  <span className="text-muted-foreground">
+                    Active Reports: <strong className="text-foreground">
+                      {isLoading ? "..." : (total - resolved).toLocaleString()}
+                    </strong>
+                  </span>
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 bg-success rounded-full animate-pulse" />
                     <span className="text-success font-medium">Live Updates</span>
