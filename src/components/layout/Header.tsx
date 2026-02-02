@@ -1,10 +1,21 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MapPin, Menu, X, FileText, LayoutDashboard, Search } from "lucide-react";
+import { MapPin, Menu, X, FileText, LayoutDashboard, Search, LogIn, LogOut, User, Shield, Wrench } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Header = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, role, signOut } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navLinks = [
@@ -15,6 +26,17 @@ const Header = () => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  const getDashboardLink = () => {
+    if (role === "admin") return "/admin";
+    if (role === "worker") return "/worker";
+    return "/dashboard";
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
@@ -44,6 +66,49 @@ const Header = () => {
               </Button>
             </Link>
           ))}
+
+          {/* Auth Section */}
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[100px] truncate">{user.email?.split("@")[0]}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col">
+                    <span className="truncate">{user.email}</span>
+                    {role && (
+                      <span className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                        {role === "admin" ? <Shield className="h-3 w-3" /> : <Wrench className="h-3 w-3" />}
+                        {role}
+                      </span>
+                    )}
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {role && (
+                  <DropdownMenuItem onClick={() => navigate(getDashboardLink())}>
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    My Dashboard
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link to="/login">
+              <Button variant="outline" size="sm" className="gap-2">
+                <LogIn className="h-4 w-4" />
+                Staff Login
+              </Button>
+            </Link>
+          )}
         </nav>
 
         {/* Mobile Menu Button */}
@@ -72,6 +137,43 @@ const Header = () => {
                 </Button>
               </Link>
             ))}
+            
+            <div className="border-t border-border my-2 pt-2">
+              {user ? (
+                <>
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    Signed in as <span className="font-medium text-foreground">{user.email}</span>
+                    {role && <span className="capitalize ml-1">({role})</span>}
+                  </div>
+                  {role && (
+                    <Link to={getDashboardLink()} onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start text-muted-foreground">
+                        <LayoutDashboard className="h-4 w-4 mr-2" />
+                        My Dashboard
+                      </Button>
+                    </Link>
+                  )}
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-destructive"
+                    onClick={() => {
+                      handleSignOut();
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <Link to="/login" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="outline" className="w-full justify-start">
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Staff Login
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
         </nav>
       )}

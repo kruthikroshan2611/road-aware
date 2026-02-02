@@ -1,117 +1,172 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, MapPin, Clock, User, FileText, CheckCircle2, AlertCircle, Wrench, ClipboardCheck } from "lucide-react";
+import { Search, MapPin, Clock, User, FileText, CheckCircle2, AlertCircle, Wrench, ClipboardCheck, Loader2, Camera } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ComplaintDetails {
   id: string;
-  type: string;
+  complaint_id: string;
+  damage_type: string;
   severity: string;
   status: string;
   location: string;
+  landmark: string | null;
   ward: string;
-  reportedBy: string;
-  reportedAt: string;
-  assignedTo: string | null;
-  timeline: {
-    status: string;
-    date: string;
-    description: string;
-    icon: typeof CheckCircle2;
-    isCompleted: boolean;
-  }[];
+  reporter_name: string;
+  reporter_phone: string;
+  description: string | null;
+  image_url: string | null;
+  gps_lat: number | null;
+  gps_lng: number | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  assigned_to: string | null;
 }
 
-const mockComplaint: ComplaintDetails = {
-  id: "SMC-2026-001234",
-  type: "Pothole",
-  severity: "Critical",
-  status: "In Progress",
-  location: "MG Road, Near City Mall",
-  ward: "Ward 12",
-  reportedBy: "Rajesh Kumar",
-  reportedAt: "January 30, 2026 at 10:30 AM",
-  assignedTo: "Public Works Dept. - Team Alpha",
-  timeline: [
-    {
-      status: "Reported",
-      date: "Jan 30, 10:30 AM",
-      description: "Complaint submitted by citizen",
-      icon: FileText,
-      isCompleted: true,
-    },
-    {
-      status: "Under Review",
-      date: "Jan 30, 11:15 AM",
-      description: "Complaint verified by ward officer",
-      icon: ClipboardCheck,
-      isCompleted: true,
-    },
-    {
-      status: "Assigned",
-      date: "Jan 30, 2:00 PM",
-      description: "Assigned to Public Works Dept.",
-      icon: User,
-      isCompleted: true,
-    },
-    {
-      status: "In Progress",
-      date: "Jan 31, 9:00 AM",
-      description: "Repair work has started",
-      icon: Wrench,
-      isCompleted: true,
-    },
-    {
-      status: "Resolved",
-      date: "Pending",
-      description: "Awaiting completion",
-      icon: CheckCircle2,
-      isCompleted: false,
-    },
-  ],
-};
+interface TimelineItem {
+  status: string;
+  date: string;
+  description: string;
+  icon: typeof CheckCircle2;
+  isCompleted: boolean;
+}
 
 const TrackComplaint = () => {
-  const [searchId, setSearchId] = useState("");
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  const [searchId, setSearchId] = useState(searchParams.get("id") || "");
   const [complaint, setComplaint] = useState<ComplaintDetails | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchId.trim()) return;
+  // Auto-search if ID is in URL params
+  useEffect(() => {
+    const idFromUrl = searchParams.get("id");
+    if (idFromUrl) {
+      setSearchId(idFromUrl);
+      searchComplaint(idFromUrl);
+    }
+  }, [searchParams]);
+
+  const searchComplaint = async (id: string) => {
+    if (!id.trim()) return;
 
     setIsSearching(true);
     setNotFound(false);
     setComplaint(null);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("complaint_id", id.trim().toUpperCase())
+        .single();
 
-    if (searchId.toUpperCase().includes("SMC") || searchId.includes("1234")) {
-      setComplaint(mockComplaint);
-    } else {
-      setNotFound(true);
+      if (error || !data) {
+        setNotFound(true);
+      } else {
+        setComplaint(data);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to search. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearching(false);
     }
+  };
 
-    setIsSearching(false);
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    searchComplaint(searchId);
+  };
+
+  const generateTimeline = (complaint: ComplaintDetails): TimelineItem[] => {
+    const createdDate = new Date(complaint.created_at);
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString("en-US", { 
+        month: "short", 
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    };
+
+    const statusOrder = ["pending", "in-progress", "resolved"];
+    const currentIndex = statusOrder.indexOf(complaint.status);
+
+    const timeline: TimelineItem[] = [
+      {
+        status: "Reported",
+        date: formatDate(createdDate),
+        description: "Complaint submitted by citizen",
+        icon: FileText,
+        isCompleted: true,
+      },
+      {
+        status: "Under Review",
+        date: currentIndex >= 0 ? formatDate(new Date(createdDate.getTime() + 3600000)) : "Pending",
+        description: "Complaint verified by ward officer",
+        icon: ClipboardCheck,
+        isCompleted: currentIndex >= 0,
+      },
+      {
+        status: "In Progress",
+        date: currentIndex >= 1 ? formatDate(new Date(complaint.updated_at)) : "Pending",
+        description: complaint.assigned_to ? "Assigned to repair team" : "Awaiting assignment",
+        icon: Wrench,
+        isCompleted: currentIndex >= 1,
+      },
+      {
+        status: "Resolved",
+        date: complaint.resolved_at ? formatDate(new Date(complaint.resolved_at)) : "Pending",
+        description: complaint.resolved_at ? "Issue has been resolved" : "Awaiting completion",
+        icon: CheckCircle2,
+        isCompleted: complaint.status === "resolved",
+      },
+    ];
+
+    return timeline;
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Resolved":
+      case "resolved":
         return "bg-success text-success-foreground";
-      case "In Progress":
+      case "in-progress":
         return "bg-primary text-primary-foreground";
-      case "Assigned":
-        return "bg-accent text-accent-foreground";
-      default:
+      case "pending":
         return "bg-warning text-warning-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
     }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case "critical":
+        return "bg-destructive text-destructive-foreground";
+      case "moderate":
+        return "bg-warning text-warning-foreground";
+      case "low":
+        return "bg-success text-success-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const formatDamageType = (type: string) => {
+    return type.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
   };
 
   return (
@@ -139,16 +194,16 @@ const TrackComplaint = () => {
               <form onSubmit={handleSearch} className="flex gap-4">
                 <div className="flex-1">
                   <Input
-                    placeholder="Enter Complaint ID (e.g., SMC-2026-001234)"
+                    placeholder="Enter Complaint ID (e.g., SMC-2026-000001)"
                     value={searchId}
-                    onChange={(e) => setSearchId(e.target.value)}
-                    className="h-12 text-base"
+                    onChange={(e) => setSearchId(e.target.value.toUpperCase())}
+                    className="h-12 text-base font-mono"
                   />
                 </div>
-                <Button type="submit" size="lg" disabled={isSearching}>
+                <Button type="submit" size="lg" disabled={isSearching || !searchId.trim()}>
                   {isSearching ? (
                     <>
-                      <span className="animate-spin mr-2">⏳</span>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                       Searching...
                     </>
                   ) : (
@@ -170,8 +225,11 @@ const TrackComplaint = () => {
                 <h3 className="text-lg font-semibold text-foreground mb-2">
                   Complaint Not Found
                 </h3>
-                <p className="text-muted-foreground">
-                  No complaint found with ID "{searchId}". Please check the ID and try again.
+                <p className="text-muted-foreground mb-4">
+                  No complaint found with ID "<span className="font-mono">{searchId}</span>". Please check the ID and try again.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Complaint IDs follow the format: SMC-YYYY-XXXXXX
                 </p>
               </CardContent>
             </Card>
@@ -185,53 +243,94 @@ const TrackComplaint = () => {
                 <CardHeader>
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <CardTitle className="text-xl font-mono">{complaint.id}</CardTitle>
-                      <CardDescription className="mt-1">
-                        {complaint.type} • {complaint.severity} Priority
+                      <CardTitle className="text-xl font-mono">{complaint.complaint_id}</CardTitle>
+                      <CardDescription className="mt-1 flex items-center gap-2 flex-wrap">
+                        <span>{formatDamageType(complaint.damage_type)}</span>
+                        <span>•</span>
+                        <Badge className={getSeverityColor(complaint.severity)}>
+                          {complaint.severity.charAt(0).toUpperCase() + complaint.severity.slice(1)} Priority
+                        </Badge>
                       </CardDescription>
                     </div>
-                    <Badge className={`${getStatusColor(complaint.status)} px-4 py-1.5 text-sm`}>
-                      {complaint.status}
+                    <Badge className={`${getStatusColor(complaint.status)} px-4 py-1.5 text-sm capitalize`}>
+                      {complaint.status.replace("-", " ")}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                      <MapPin className="h-5 w-5 text-primary mt-0.5" />
+                      <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-sm font-medium text-foreground">Location</p>
                         <p className="text-sm text-muted-foreground">
                           {complaint.location}
+                          {complaint.landmark && <><br />Near: {complaint.landmark}</>}
                           <br />
-                          {complaint.ward}
+                          {complaint.ward.replace("ward-", "Ward ")}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                      <Clock className="h-5 w-5 text-primary mt-0.5" />
+                      <Clock className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-sm font-medium text-foreground">Reported On</p>
-                        <p className="text-sm text-muted-foreground">{complaint.reportedAt}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(complaint.created_at).toLocaleDateString("en-US", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit"
+                          })}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                      <User className="h-5 w-5 text-primary mt-0.5" />
+                      <User className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-sm font-medium text-foreground">Reported By</p>
-                        <p className="text-sm text-muted-foreground">{complaint.reportedBy}</p>
+                        <p className="text-sm text-muted-foreground">{complaint.reporter_name}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                      <Wrench className="h-5 w-5 text-primary mt-0.5" />
+                      <Wrench className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-sm font-medium text-foreground">Assigned To</p>
+                        <p className="text-sm font-medium text-foreground">Status</p>
                         <p className="text-sm text-muted-foreground">
-                          {complaint.assignedTo || "Not yet assigned"}
+                          {complaint.status === "resolved" 
+                            ? "Issue has been resolved"
+                            : complaint.status === "in-progress"
+                            ? "Repair work in progress"
+                            : "Under review by authorities"}
                         </p>
                       </div>
                     </div>
                   </div>
+
+                  {/* Description */}
+                  {complaint.description && (
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-sm font-medium text-foreground mb-1">Description</p>
+                      <p className="text-sm text-muted-foreground">{complaint.description}</p>
+                    </div>
+                  )}
+
+                  {/* Image */}
+                  {complaint.image_url && (
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                        <Camera className="h-4 w-4" />
+                        Photo Evidence
+                      </p>
+                      <img 
+                        src={complaint.image_url} 
+                        alt="Road damage" 
+                        className="rounded-lg max-h-64 object-cover"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -245,15 +344,18 @@ const TrackComplaint = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="relative">
-                    {complaint.timeline.map((item, index) => (
+                    {generateTimeline(complaint).map((item, index, arr) => (
                       <div key={item.status} className="flex gap-4 pb-8 last:pb-0">
                         {/* Connector Line */}
-                        {index < complaint.timeline.length - 1 && (
+                        {index < arr.length - 1 && (
                           <div
-                            className={`absolute left-5 mt-10 w-0.5 h-[calc(100%-2.5rem)] ${
+                            className={`absolute left-5 w-0.5 ${
                               item.isCompleted ? "bg-primary" : "bg-border"
                             }`}
-                            style={{ top: `${index * 80 + 40}px`, height: "40px" }}
+                            style={{ 
+                              top: `${index * 80 + 40}px`, 
+                              height: "40px" 
+                            }}
                           />
                         )}
 
@@ -290,6 +392,21 @@ const TrackComplaint = () => {
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {/* Empty state when no search has been made */}
+          {!complaint && !notFound && !isSearching && !searchId && (
+            <Card className="animate-slide-up">
+              <CardContent className="py-12 text-center">
+                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Enter Your Complaint ID
+                </h3>
+                <p className="text-muted-foreground">
+                  Use the search box above to track the status of your complaint
+                </p>
+              </CardContent>
+            </Card>
           )}
         </div>
       </main>
