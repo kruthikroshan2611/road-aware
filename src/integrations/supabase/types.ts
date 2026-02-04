@@ -43,7 +43,9 @@ export type Database = {
       }
       reports: {
         Row: {
+          after_image_url: string | null
           assigned_to: string | null
+          before_image_url: string | null
           complaint_id: string
           created_at: string
           damage_type: string
@@ -64,7 +66,9 @@ export type Database = {
           ward: string
         }
         Insert: {
+          after_image_url?: string | null
           assigned_to?: string | null
+          before_image_url?: string | null
           complaint_id: string
           created_at?: string
           damage_type: string
@@ -85,7 +89,9 @@ export type Database = {
           ward: string
         }
         Update: {
+          after_image_url?: string | null
           assigned_to?: string | null
+          before_image_url?: string | null
           complaint_id?: string
           created_at?: string
           damage_type?: string

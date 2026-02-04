@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { ImagePreviewModal } from "@/components/dashboard/ImagePreviewModal";
+import { BeforeAfterUpload } from "@/components/dashboard/BeforeAfterUpload";
 import { 
   Wrench, Clock, CheckCircle2, AlertTriangle, MapPin, Calendar, 
-  User, Phone, FileText, Camera
+  User, Phone, FileText, Camera, Eye
 } from "lucide-react";
 
 interface Report {
@@ -26,6 +28,8 @@ interface Report {
   ward: string;
   description: string | null;
   image_url: string | null;
+  before_image_url: string | null;
+  after_image_url: string | null;
   gps_lat: number | null;
   gps_lng: number | null;
   status: string;
@@ -40,6 +44,7 @@ const WorkerDashboard = () => {
   const [assignedReports, setAssignedReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
     if (!loading && (!user || role !== "worker")) {
@@ -318,15 +323,30 @@ const WorkerDashboard = () => {
                     {selectedReport.image_url && (
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Camera className="h-3 w-3" /> Photo Evidence
+                          <Camera className="h-3 w-3" /> Damage Photo
                         </p>
-                        <img 
-                          src={selectedReport.image_url} 
-                          alt="Damage" 
-                          className="rounded-lg max-h-64 object-cover"
-                        />
+                        <div className="relative group cursor-pointer" onClick={() => setPreviewImage({ url: selectedReport.image_url!, title: "Damage Photo" })}>
+                          <img 
+                            src={selectedReport.image_url} 
+                            alt="Damage" 
+                            className="rounded-lg max-h-48 object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                            <Eye className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
                       </div>
                     )}
+
+                    {/* Before/After Upload for Workers */}
+                    <BeforeAfterUpload
+                      reportId={selectedReport.id}
+                      beforeImageUrl={selectedReport.before_image_url}
+                      afterImageUrl={selectedReport.after_image_url}
+                      onUploadComplete={() => {
+                        fetchAssignedReports();
+                      }}
+                    />
                   </div>
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
@@ -339,6 +359,14 @@ const WorkerDashboard = () => {
           </div>
         </main>
       </div>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        imageUrl={previewImage?.url || null}
+        title={previewImage?.title}
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
     </SidebarProvider>
   );
 };
