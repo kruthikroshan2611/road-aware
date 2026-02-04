@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { ImagePreviewModal } from "@/components/dashboard/ImagePreviewModal";
 import { 
   BarChart3, FileText, Users, Clock, CheckCircle2, AlertTriangle, 
-  Search, Filter, MapPin, Calendar
+  Search, Filter, MapPin, Calendar, Camera
 } from "lucide-react";
 
 interface Report {
@@ -27,6 +28,9 @@ interface Report {
   status: string;
   created_at: string;
   assigned_to: string | null;
+  image_url: string | null;
+  before_image_url: string | null;
+  after_image_url: string | null;
 }
 
 interface Stats {
@@ -47,6 +51,7 @@ const AdminDashboard = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [wardFilter, setWardFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
     if (!loading && (!user || role !== "admin")) {
@@ -268,6 +273,7 @@ const AdminDashboard = () => {
                       <TableHead>Severity</TableHead>
                       <TableHead>Location</TableHead>
                       <TableHead>Ward</TableHead>
+                      <TableHead>Photos</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Actions</TableHead>
@@ -282,6 +288,46 @@ const AdminDashboard = () => {
                         <TableCell>{getSeverityBadge(report.severity)}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{report.location}</TableCell>
                         <TableCell>{report.ward?.replace("ward-", "Ward ")}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {report.image_url && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setPreviewImage({ url: report.image_url!, title: "Damage Photo" })}
+                                title="View damage photo"
+                              >
+                                <Camera className="h-4 w-4 text-primary" />
+                              </Button>
+                            )}
+                            {report.before_image_url && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setPreviewImage({ url: report.before_image_url!, title: "Before Repair" })}
+                                title="View before photo"
+                              >
+                                <span className="text-xs font-medium text-orange-600">B</span>
+                              </Button>
+                            )}
+                            {report.after_image_url && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setPreviewImage({ url: report.after_image_url!, title: "After Repair" })}
+                                title="View after photo"
+                              >
+                                <span className="text-xs font-medium text-green-600">A</span>
+                              </Button>
+                            )}
+                            {!report.image_url && !report.before_image_url && !report.after_image_url && (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{getStatusBadge(report.status)}</TableCell>
                         <TableCell>{new Date(report.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
@@ -308,6 +354,14 @@ const AdminDashboard = () => {
           </Card>
         </main>
       </div>
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        imageUrl={previewImage?.url || null}
+        title={previewImage?.title}
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
     </SidebarProvider>
   );
 };
