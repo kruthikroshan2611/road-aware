@@ -69,7 +69,7 @@ export type Database = {
           after_image_url?: string | null
           assigned_to?: string | null
           before_image_url?: string | null
-          complaint_id: string
+          complaint_id?: string
           created_at?: string
           damage_type: string
           description?: string | null
