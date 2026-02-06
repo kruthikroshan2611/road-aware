@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { ImagePreviewModal } from "@/components/dashboard/ImagePreviewModal";
+import { WorkerAssignmentSelect } from "@/components/dashboard/WorkerAssignmentSelect";
 import { 
   BarChart3, FileText, Users, Clock, CheckCircle2, AlertTriangle, 
   Search, Filter, MapPin, Calendar, Camera
@@ -108,6 +109,12 @@ const AdminDashboard = () => {
   };
 
   const updateReportStatus = async (reportId: string, newStatus: string) => {
+    const { data: report } = await supabase
+      .from("reports")
+      .select("reporter_email, complaint_id")
+      .eq("id", reportId)
+      .single();
+
     const { error } = await supabase
       .from("reports")
       .update({ 
@@ -120,9 +127,32 @@ const AdminDashboard = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Status Updated", description: `Report status changed to ${newStatus}` });
+      
+      // Send email notification for status change
+      if (report?.reporter_email) {
+        try {
+          await supabase.functions.invoke("send-status-notification", {
+            body: {
+              reportId,
+              type: "status_change",
+              newStatus,
+              email: report.reporter_email,
+              complaintId: report.complaint_id,
+            },
+          });
+        } catch (e) {
+          console.error("Failed to send notification:", e);
+        }
+      }
+      
       fetchReports();
       fetchStats();
     }
+  };
+
+  const handleAssignmentChange = () => {
+    fetchReports();
+    fetchStats();
   };
 
   const getStatusBadge = (status: string) => {
@@ -201,10 +231,10 @@ const AdminDashboard = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{stats.resolved}</div>
+                <div className="text-2xl font-bold text-success">{stats.resolved}</div>
               </CardContent>
             </Card>
           </div>
@@ -274,6 +304,7 @@ const AdminDashboard = () => {
                       <TableHead>Location</TableHead>
                       <TableHead>Ward</TableHead>
                       <TableHead>Photos</TableHead>
+                      <TableHead>Assigned To</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Actions</TableHead>
@@ -309,7 +340,7 @@ const AdminDashboard = () => {
                                 onClick={() => setPreviewImage({ url: report.before_image_url!, title: "Before Repair" })}
                                 title="View before photo"
                               >
-                                <span className="text-xs font-medium text-orange-600">B</span>
+                                <span className="text-xs font-medium text-warning">B</span>
                               </Button>
                             )}
                             {report.after_image_url && (
@@ -320,13 +351,20 @@ const AdminDashboard = () => {
                                 onClick={() => setPreviewImage({ url: report.after_image_url!, title: "After Repair" })}
                                 title="View after photo"
                               >
-                                <span className="text-xs font-medium text-green-600">A</span>
+                                <span className="text-xs font-medium text-success">A</span>
                               </Button>
                             )}
                             {!report.image_url && !report.before_image_url && !report.after_image_url && (
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <WorkerAssignmentSelect
+                            reportId={report.id}
+                            currentAssignee={report.assigned_to}
+                            onAssignmentChange={handleAssignmentChange}
+                          />
                         </TableCell>
                         <TableCell>{getStatusBadge(report.status)}</TableCell>
                         <TableCell>{new Date(report.created_at).toLocaleDateString()}</TableCell>
