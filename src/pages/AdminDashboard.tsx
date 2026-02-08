@@ -10,9 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ImagePreviewModal } from "@/components/dashboard/ImagePreviewModal";
 import { WorkerAssignmentSelect } from "@/components/dashboard/WorkerAssignmentSelect";
+import { WorkerManagement } from "@/components/dashboard/WorkerManagement";
 import { 
   BarChart3, FileText, Users, Clock, CheckCircle2, AlertTriangle, 
   Search, Filter, MapPin, Calendar, Camera
@@ -239,48 +241,62 @@ const AdminDashboard = () => {
             </Card>
           </div>
 
-          {/* Filters */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex flex-wrap gap-4">
-                <div className="flex-1 min-w-[200px]">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by ID, location, or name..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
+          {/* Tabs for Reports and Workers */}
+          <Tabs defaultValue="reports" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="reports" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Reports
+              </TabsTrigger>
+              <TabsTrigger value="workers" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Workers
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="reports" className="space-y-6">
+              {/* Filters */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by ID, location, or name..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in-progress">In Progress</SelectItem>
+                        <SelectItem value="resolved">Resolved</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={wardFilter} onValueChange={setWardFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Ward" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Wards</SelectItem>
+                        {Array.from({ length: 20 }, (_, i) => (
+                          <SelectItem key={i + 1} value={`ward-${i + 1}`}>
+                            Ward {i + 1}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in-progress">In Progress</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={wardFilter} onValueChange={setWardFilter}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Ward" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Wards</SelectItem>
-                    {Array.from({ length: 20 }, (_, i) => (
-                      <SelectItem key={i + 1} value={`ward-${i + 1}`}>
-                        Ward {i + 1}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
           {/* Reports Table */}
           <Card>
@@ -390,6 +406,12 @@ const AdminDashboard = () => {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="workers">
+              <WorkerManagement />
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
 
